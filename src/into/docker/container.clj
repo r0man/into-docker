@@ -72,6 +72,12 @@
        (d/invoke commit)
        (throw-on-error)))
 
+(def ^:private docker-socket-binding
+  {:Target "/var/run/docker.sock"
+   :Source "/var/run/docker.sock"
+   :Type "bind"
+   :ReadOnly false})
+
 (defn- invoke-run-container
   [{:keys [containers]} container-name {:keys [full-name user volumes]}]
   (let [{:keys [Id]}
@@ -81,12 +87,14 @@
                               :User  user
                               :Cmd   ["tail" "-f" "/dev/null"]
                               :HostConfig
-                              {:Mounts (vec
-                                         (for [[path volume] volumes]
-                                           {:Target   path,
-                                            :Source   volume,
-                                            :Type     "volume",
-                                            :ReadOnly false}))}}}}
+                              {:NetworkMode "host"
+                               :Mounts (vec
+                                        (cons docker-socket-binding
+                                              (for [[path volume] volumes]
+                                                {:Target   path,
+                                                 :Source   volume,
+                                                 :Type     "volume",
+                                                 :ReadOnly false})))}}}}
              (d/invoke containers)
              (throw-on-error))
         _ (->> {:op :ContainerStart
